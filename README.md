@@ -15,17 +15,17 @@ A native macOS application for reading, writing, erasing, and recovering the fla
   - Configurable start address (hex)
   - Auto-erase before write (range erase, not full chip — fast)
   - Read-back verify after write
-  - Chunked 64 KB transfers with live speed and ETA display
+  - Chunked 64 KB transfers with live progress bar
 - **Write ROM via WiFi** — delivers a ROM over TCP to a Genesis running the wflash WiFi loader ROM
   - Connects to any IP:port (default port 1989)
   - Queries bootloader address from the running wflash ROM and patches the ROM header so the wflash menu survives after a power cycle
   - ROM size guard: rejects images that would overwrite the wflash bootloader
-  - Chunked transfer with live progress
+  - Chunked transfer with live progress bar
 
 ### Read
 - Reads flash contents to a binary file on disk
 - Configurable start address and length
-- Chunked 64 KB reads with live speed and ETA display
+- Chunked 64 KB reads with live progress bar
 
 ### Erase
 - **Full chip erase** — erases the entire flash (up to ~2 minutes, uses chip-erase command)
