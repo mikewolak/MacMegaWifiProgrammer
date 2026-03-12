@@ -48,26 +48,25 @@ int UsbInit(void)
 		return -1;
 	}
 
-	// Uncomment this to flood the screen with libusb debug information
-	//libusb_set_debug(NULL, LIBUSB_LOG_LEVEL_DEBUG);
-
-
 	// Detecting megawifi device
 	megawifi_handle = libusb_open_device_with_vid_pid( NULL, MeGaWiFi_VID, MeGaWiFi_PID );
 
 	if( megawifi_handle == NULL ) {
 		PrintErr( "Error: could not open device %.4X : %.4X\n", MeGaWiFi_VID, MeGaWiFi_PID );
+		libusb_exit(NULL);
 		return -1;
 	}
 
 	megawifi_dev = libusb_get_device( megawifi_handle );
-
 
 	// Set megawifi configuration
 	r = libusb_set_configuration( megawifi_handle, MeGaWiFi_CONFIG );
 	if( r < 0 ) {
 		PrintErr( "Error: could not set configuration #%d\n", MeGaWiFi_CONFIG );
 		PrintErr( "   Code: %s\n", libusb_error_name(r) );
+		libusb_close(megawifi_handle);
+		megawifi_handle = NULL;
+		libusb_exit(NULL);
 		return -1;
 	}
 
@@ -77,17 +76,34 @@ int UsbInit(void)
 	{
 		PrintErr( "Error: could not claim interface #%d\n", MeGaWiFi_INTERF );
 		PrintErr( "   Code: %s\n", libusb_error_name(r) );
+		libusb_close(megawifi_handle);
+		megawifi_handle = NULL;
+		libusb_exit(NULL);
 		return -1;
 	}
 	return 0;
 }
 
-/// Ends USB session with device
+/// Ends USB session with device (normal close — releases interface first)
 void UsbClose(void)
 {
 	if (megawifi_handle) {
 		libusb_release_interface(megawifi_handle, 0);
 		libusb_close(megawifi_handle);
+		megawifi_handle = NULL;
+	}
+
+	libusb_exit(NULL);
+}
+
+/// Safe teardown after physical device removal.
+/// libusb_release_interface() asserts when the device is already gone from the
+/// OS, so we skip it — the kernel already released the interface on disconnect.
+void UsbCloseOnRemoval(void)
+{
+	if (megawifi_handle) {
+		libusb_close(megawifi_handle);
+		megawifi_handle = NULL;
 	}
 
 	libusb_exit(NULL);

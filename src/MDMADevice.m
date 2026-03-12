@@ -168,10 +168,23 @@ static void deviceAdded(void *ctx, io_iterator_t iter) {
 
 static void deviceRemoved(void *ctx, io_iterator_t iter) {
     io_service_t svc;
-    while ((svc = IOIteratorNext(iter))) IOObjectRelease(svc);
+    BOOL anyRemoved = NO;
+    while ((svc = IOIteratorNext(iter))) { IOObjectRelease(svc); anyRemoved = YES; }
+    if (!anyRemoved) return;  // startup drain — no real removal
+
     MDMADevice *dev = (__bridge MDMADevice *)ctx;
+
+    // Clear connected immediately here (main thread) — before any dispatch —
+    // so _tryConnect on _usbQueue sees NO and does not bail out on replug.
+    dev->_connected = NO;
+
+    // UsbCloseOnRemoval must run on _usbQueue (serial), which guarantees it
+    // completes before any subsequent _tryConnect that is also queued there.
+    dispatch_async(dev->_usbQueue, ^{ UsbCloseOnRemoval(); });
+
+    // Post the UI notification directly to main — not through _usbQueue —
+    // so it fires immediately and isn't delayed by in-progress USB operations.
     dispatch_async(dispatch_get_main_queue(), ^{
-        dev.connected  = NO;
         dev.deviceInfo = nil;
         [[NSNotificationCenter defaultCenter]
             postNotificationName:MDMADeviceDisconnectedNotification object:dev];
@@ -214,7 +227,15 @@ static void deviceRemoved(void *ctx, io_iterator_t iter) {
 
 - (void)_tryConnect {
     if (self.connected) return;
-    if (UsbInit() != 0) return;
+    // IOKit fires deviceAdded before libusb can fully enumerate the device.
+    // Retry a few times with a short delay to let the device settle.
+    int usbInitResult = -1;
+    for (int attempt = 0; attempt < 5; attempt++) {
+        if (attempt > 0) [NSThread sleepForTimeInterval:0.3];
+        usbInitResult = UsbInit();
+        if (usbInitResult == 0) break;
+    }
+    if (usbInitResult != 0) return;
 
     InitData id;
     memset(&id, 0, sizeof(id));

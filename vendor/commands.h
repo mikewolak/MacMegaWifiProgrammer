@@ -154,8 +154,12 @@ extern "C" {
 //=============================================================================
 int UsbInit(void);
 
-/// Ends USB session with device
+/// Ends USB session with device (normal close — releases interface first)
 void UsbClose(void);
+
+/// Safe teardown after physical device removal — skips libusb_release_interface
+/// which asserts when the device is already gone from the OS.
+void UsbCloseOnRemoval(void);
 
 u16 MDMA_manId_get(uint8_t *manId);
 

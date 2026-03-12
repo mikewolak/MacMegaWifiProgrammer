@@ -161,7 +161,9 @@
     [alert addButtonWithTitle:@"Cancel"];
     alert.alertStyle = NSAlertStyleInformational;
 
-    [alert beginSheetModalForWindow:self.view.window completionHandler:^(NSModalResponse r) {
+    NSWindow *win = self.view.window;
+    if (!win) { return; }   // view not yet in a window — skip the prompt
+    [alert beginSheetModalForWindow:win completionHandler:^(NSModalResponse r) {
         if (r == NSAlertFirstButtonReturn || r == NSAlertSecondButtonReturn) {
             NSInteger seg = (r == NSAlertFirstButtonReturn) ? 0 : 1;
             self->_cartTypeControl.selectedSegment = seg;

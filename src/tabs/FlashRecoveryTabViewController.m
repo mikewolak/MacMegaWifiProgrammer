@@ -7,9 +7,19 @@
 #import "FlashRecoveryTabViewController.h"
 #import "MainWindowController.h"
 #import "MDMADevice.h"
+#import <CommonCrypto/CommonDigest.h>
 
 #include "wflash_head.h"   // wflash_head[], wflash_head_len  — 512 bytes @ 0x000000
 #include "wflash_tail.h"   // wflash_tail[], wflash_tail_len  — 65536 bytes @ 0x7F0000
+
+static NSString *md5OfData(const void *bytes, NSUInteger len) {
+    unsigned char digest[CC_MD5_DIGEST_LENGTH];
+    CC_MD5(bytes, (CC_LONG)len, digest);
+    NSMutableString *s = [NSMutableString stringWithCapacity:32];
+    for (int i = 0; i < CC_MD5_DIGEST_LENGTH; i++)
+        [s appendFormat:@"%02x", digest[i]];
+    return s;
+}
 
 #define WFLASH_HEAD_ADDR  0x000000
 #define WFLASH_TAIL_ADDR  0x7F0000
@@ -143,6 +153,12 @@
     }
 
     NSString *what = (doHead && doTail) ? @"head + tail" : doHead ? @"head" : @"tail";
+    NSLog(@"[Recovery] starting: doHead=%d doTail=%d (%@)", doHead, doTail, what);
+    NSLog(@"[Recovery] head: addr=0x%06X len=%u md5=%@", WFLASH_HEAD_ADDR, wflash_head_len,
+          md5OfData(wflash_head, wflash_head_len));
+    NSLog(@"[Recovery] tail: addr=0x%06X len=%u md5=%@", WFLASH_TAIL_ADDR, wflash_tail_len,
+          md5OfData(wflash_tail, wflash_tail_len));
+
     [self.windowController setOperationActive:YES];
     [self updateStatus:[NSString stringWithFormat:@"Recovering %@…", what]];
     [self updateProgress:0];
@@ -152,11 +168,15 @@
 
 - (void)_runRecovery:(BOOL)doHead tail:(BOOL)doTail step:(int)step totalSteps:(int)total
 {
+    NSLog(@"[Recovery] _runRecovery: doHead=%d doTail=%d step=%d total=%d", doHead, doTail, step, total);
+
     if (doHead) {
         NSData *data = [NSData dataWithBytesNoCopy:(void *)wflash_head
                                             length:wflash_head_len
                                       freeWhenDone:NO];
-        [self updateStatus:@"Reflashing head (0x000000)…"];
+        NSLog(@"[Recovery] writing head: %u bytes at 0x%06X", wflash_head_len, WFLASH_HEAD_ADDR);
+        [self updateStatus:@"Erasing + writing head (0x000000, 512 B)…"];
+
         [[MDMADevice sharedDevice] writeFlashData:data
                                         atAddress:WFLASH_HEAD_ADDR
                                         autoErase:YES
@@ -167,15 +187,47 @@
             [self updateStatus:st];
         } completion:^(NSError *err) {
             if (err) {
+                NSLog(@"[Recovery] HEAD FAILED: %@", err.localizedDescription);
                 [self operationDone];
-                [self updateStatus:[NSString stringWithFormat:@"Head flash failed: %@",
+                [self updateStatus:[NSString stringWithFormat:@"Head flash FAILED: %@",
                                     err.localizedDescription]];
-            } else if (doTail) {
-                [self _runRecovery:NO tail:YES step:step+1 totalSteps:total];
-            } else {
-                [self operationDone];
-                [self updateStatus:@"Head reflashed — wflash loader restored."];
+                return;
             }
+            NSLog(@"[Recovery] head write+verify OK — now running MD5 readback");
+            [self updateStatus:@"Head written — reading back for MD5 check…"];
+
+            // MD5 readback verification
+            [[MDMADevice sharedDevice] readFlashAtAddress:WFLASH_HEAD_ADDR
+                                                   length:wflash_head_len
+                                                 progress:nil
+                                               completion:^(NSData *rb, NSError *re) {
+                if (re || !rb) {
+                    NSLog(@"[Recovery] head readback failed: %@", re.localizedDescription);
+                    [self updateStatus:@"Head MD5 readback failed — flash may be incomplete."];
+                } else {
+                    NSString *expectedMD5 = md5OfData(wflash_head, wflash_head_len);
+                    NSString *actualMD5   = md5OfData(rb.bytes, rb.length);
+                    BOOL match = [expectedMD5 isEqualToString:actualMD5];
+                    NSLog(@"[Recovery] head MD5 expected: %@", expectedMD5);
+                    NSLog(@"[Recovery] head MD5 actual:   %@", actualMD5);
+                    NSLog(@"[Recovery] head MD5 match: %@", match ? @"YES ✓" : @"NO ✗");
+                    if (!match) {
+                        [self operationDone];
+                        [self updateStatus:[NSString stringWithFormat:
+                            @"Head MD5 MISMATCH — flash corrupted!\n"
+                            @"expected: %@\nactual:   %@", expectedMD5, actualMD5]];
+                        return;
+                    }
+                    [self updateStatus:[NSString stringWithFormat:@"Head OK ✓  md5:%@", expectedMD5]];
+                }
+
+                if (doTail) {
+                    [self _runRecovery:NO tail:YES step:step+1 totalSteps:total];
+                } else {
+                    [self operationDone];
+                    NSLog(@"[Recovery] complete (head only)");
+                }
+            }];
         }];
         return;
     }
@@ -184,7 +236,9 @@
         NSData *data = [NSData dataWithBytesNoCopy:(void *)wflash_tail
                                             length:wflash_tail_len
                                       freeWhenDone:NO];
-        [self updateStatus:@"Reflashing tail (0x7F0000)…"];
+        NSLog(@"[Recovery] writing tail: %u bytes at 0x%06X", wflash_tail_len, WFLASH_TAIL_ADDR);
+        [self updateStatus:@"Erasing + writing tail (0x7F0000, 64 KB)…"];
+
         [[MDMADevice sharedDevice] writeFlashData:data
                                         atAddress:WFLASH_TAIL_ADDR
                                         autoErase:YES
@@ -194,10 +248,42 @@
             [self updateProgress:overall];
             [self updateStatus:st];
         } completion:^(NSError *err) {
-            [self operationDone];
-            [self updateStatus:err
-                ? [NSString stringWithFormat:@"Tail flash failed: %@", err.localizedDescription]
-                : @"Tail reflashed — wflash loader restored."];
+            if (err) {
+                NSLog(@"[Recovery] TAIL FAILED: %@", err.localizedDescription);
+                [self operationDone];
+                [self updateStatus:[NSString stringWithFormat:@"Tail flash FAILED: %@",
+                                    err.localizedDescription]];
+                return;
+            }
+            NSLog(@"[Recovery] tail write+verify OK — now running MD5 readback");
+            [self updateStatus:@"Tail written — reading back for MD5 check…"];
+
+            [[MDMADevice sharedDevice] readFlashAtAddress:WFLASH_TAIL_ADDR
+                                                   length:wflash_tail_len
+                                                 progress:nil
+                                               completion:^(NSData *rb, NSError *re) {
+                if (re || !rb) {
+                    NSLog(@"[Recovery] tail readback failed: %@", re.localizedDescription);
+                    [self updateStatus:@"Tail MD5 readback failed — flash may be incomplete."];
+                } else {
+                    NSString *expectedMD5 = md5OfData(wflash_tail, wflash_tail_len);
+                    NSString *actualMD5   = md5OfData(rb.bytes, rb.length);
+                    BOOL match = [expectedMD5 isEqualToString:actualMD5];
+                    NSLog(@"[Recovery] tail MD5 expected: %@", expectedMD5);
+                    NSLog(@"[Recovery] tail MD5 actual:   %@", actualMD5);
+                    NSLog(@"[Recovery] tail MD5 match: %@", match ? @"YES ✓" : @"NO ✗");
+                    if (!match) {
+                        [self operationDone];
+                        [self updateStatus:[NSString stringWithFormat:
+                            @"Tail MD5 MISMATCH — flash corrupted!\n"
+                            @"expected: %@\nactual:   %@", expectedMD5, actualMD5]];
+                        return;
+                    }
+                    [self updateStatus:[NSString stringWithFormat:@"Tail OK ✓  md5:%@", expectedMD5]];
+                }
+                [self operationDone];
+                NSLog(@"[Recovery] complete");
+            }];
         }];
     }
 }
