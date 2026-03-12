@@ -1,0 +1,15 @@
+# Autotools build artifacts — not needed for our Makefile-based build
+Makefile
+*/Makefile
+libusb-1.0.pc
+config.log
+config.status
+stamp-h1
+libtool
+*.lo
+*.la
+*.lai
+.libs/
+_libs/
+.deps/
+.dirstamp

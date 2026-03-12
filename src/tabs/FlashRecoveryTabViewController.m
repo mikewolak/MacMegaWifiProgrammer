@@ -10,6 +10,7 @@
 
 // Bundled firmware metadata
 #define WFLASH_VERSION    @"v1.2"
+#define WFLASH_DATE       @"2026-01-04"
 #define WFLASH_MD5        @"3593bdeac241dc26200b07c118eab81f"
 #define WFLASH_PKG_URL    @"https://gitlab.com/doragasu/mw-wflash/-/packages/50903297"
 
@@ -67,8 +68,8 @@ static NSString *md5OfData(NSData *data) {
 
     // ── Firmware metadata row ──────────────────────────────────────────────
     NSTextField *verLabel = [NSTextField labelWithString:
-        [NSString stringWithFormat:@"Version: %@    Size: %lu bytes (%.2f MB)    MD5: %@",
-         WFLASH_VERSION, (unsigned long)binSize, binSize / 1048576.0, WFLASH_MD5]];
+        [NSString stringWithFormat:@"Version: %@    Released: %@    Size: %lu bytes (%.2f MB)    MD5: %@",
+         WFLASH_VERSION, WFLASH_DATE, (unsigned long)binSize, binSize / 1048576.0, WFLASH_MD5]];
     verLabel.font      = [NSFont monospacedSystemFontOfSize:11 weight:NSFontWeightRegular];
     verLabel.textColor = [NSColor secondaryLabelColor];
     verLabel.translatesAutoresizingMaskIntoConstraints = NO;

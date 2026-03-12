@@ -2,9 +2,8 @@
 #
 # Builds MegaDriveProgrammer.app in ./build/
 #
-# Requires:
-#   - Xcode Command Line Tools  (clang, actool, etc.)
-#   - libusb-1.0  (brew install libusb)
+# Requires only Xcode Command Line Tools — no Homebrew dependencies.
+# libusb 1.0.29 is vendored in third_party/ and built from source.
 
 APP_NAME    = MegaDriveProgrammer
 BUNDLE_NAME = $(APP_NAME).app
@@ -16,20 +15,46 @@ BINARY      = $(APP_BUNDLE)/Contents/MacOS/$(APP_NAME)
 # --------------------------------------------------------------------------
 # Toolchain
 # --------------------------------------------------------------------------
-HOMEBREW    = /Users/MWOLAK/homebrew
-CC          = clang
-CFLAGS      = -Wall -O2 -fobjc-arc \
-              -I$(HOMEBREW)/Cellar/libusb/1.0.29/include \
-              -Ivendor -Isrc -Isrc/tabs \
-              -mmacosx-version-min=11.0
+CC      = clang
+CFLAGS  = -Wall -O2 -fobjc-arc \
+          -Ithird_party/libusb-1.0.29 \
+          -Ithird_party/libusb-1.0.29/libusb \
+          -Ivendor -Isrc -Isrc/tabs \
+          -mmacosx-version-min=11.0
 
-LDFLAGS     = -framework Cocoa \
-              -framework IOKit \
-              -framework CoreFoundation \
-              -L$(HOMEBREW)/lib -lusb-1.0
+LDFLAGS = -framework Cocoa \
+          -framework IOKit \
+          -framework CoreFoundation \
+          -framework Security \
+          $(BUILD_DIR)/libusb.a
 
 # --------------------------------------------------------------------------
-# Sources
+# libusb 1.0.29 — built from source, macOS/Darwin backend
+# --------------------------------------------------------------------------
+LIBUSB_DIR = third_party/libusb-1.0.29
+LIBUSB_A   = $(BUILD_DIR)/libusb.a
+
+LIBUSB_SRCS = \
+    $(LIBUSB_DIR)/libusb/core.c \
+    $(LIBUSB_DIR)/libusb/descriptor.c \
+    $(LIBUSB_DIR)/libusb/hotplug.c \
+    $(LIBUSB_DIR)/libusb/io.c \
+    $(LIBUSB_DIR)/libusb/strerror.c \
+    $(LIBUSB_DIR)/libusb/sync.c \
+    $(LIBUSB_DIR)/libusb/os/darwin_usb.c \
+    $(LIBUSB_DIR)/libusb/os/events_posix.c \
+    $(LIBUSB_DIR)/libusb/os/threads_posix.c
+
+LIBUSB_OBJS = $(patsubst $(LIBUSB_DIR)/%.c,$(OBJ_DIR)/libusb/%.o,$(LIBUSB_SRCS))
+
+LIBUSB_CFLAGS = -O2 \
+    -I$(LIBUSB_DIR) \
+    -I$(LIBUSB_DIR)/libusb \
+    -mmacosx-version-min=11.0 \
+    -Wno-deprecated-declarations
+
+# --------------------------------------------------------------------------
+# App sources
 # --------------------------------------------------------------------------
 VENDOR_C = vendor/commands.c \
            vendor/mdma.c \
@@ -65,10 +90,20 @@ $(APP_BUNDLE): $(BINARY) Resources/Info.plist Resources/wflash.bin
 	@cp Resources/wflash.bin   $(APP_BUNDLE)/Contents/Resources/wflash.bin
 	@echo "Built $(APP_BUNDLE)"
 
-$(BINARY): $(OBJS)
+$(BINARY): $(OBJS) $(LIBUSB_A)
 	@mkdir -p $(APP_BUNDLE)/Contents/MacOS
 	$(CC) $(OBJS) $(LDFLAGS) -o $@
 
+# libusb static library
+$(LIBUSB_A): $(LIBUSB_OBJS)
+	@mkdir -p $(BUILD_DIR)
+	libtool -static -o $@ $^
+
+$(OBJ_DIR)/libusb/%.o: $(LIBUSB_DIR)/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(LIBUSB_CFLAGS) -c $< -o $@
+
+# App object files
 $(OBJ_DIR)/%.o: %.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
