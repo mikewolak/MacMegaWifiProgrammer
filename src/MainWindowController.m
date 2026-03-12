@@ -65,7 +65,7 @@ static NSString * const kItemRecovery = @"Recovery";
 - (void)_setup
 {
     NSWindow *win = self.window;
-    win.title = @"MegaDrive Programmer";
+    win.title = @"MegaWifi Programmer";
     win.minSize = NSMakeSize(540, 420);
     win.delegate = self;
     win.releasedWhenClosed = NO;

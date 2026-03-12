@@ -5,7 +5,7 @@
 # Requires only Xcode Command Line Tools — no Homebrew dependencies.
 # libusb 1.0.29 is vendored in third_party/ and built from source.
 
-APP_NAME    = MegaDriveProgrammer
+APP_NAME    = MegaWifiProgrammer
 BUNDLE_NAME = $(APP_NAME).app
 BUILD_DIR   = build
 OBJ_DIR     = $(BUILD_DIR)/obj
@@ -80,14 +80,18 @@ OBJS   = $(OBJS_C) $(OBJS_M)
 # --------------------------------------------------------------------------
 # Targets
 # --------------------------------------------------------------------------
-.PHONY: all clean run
+DMG_NAME    = MegaWifiProgrammer
+DMG_OUT     = $(BUILD_DIR)/$(DMG_NAME).dmg
+
+.PHONY: all clean run dmg
 
 all: $(APP_BUNDLE)
 
-$(APP_BUNDLE): $(BINARY) Resources/Info.plist Resources/wflash.bin
+$(APP_BUNDLE): $(BINARY) Resources/Info.plist Resources/wflash.bin Resources/AppIcon.icns
 	@mkdir -p $(APP_BUNDLE)/Contents/Resources
-	@cp Resources/Info.plist   $(APP_BUNDLE)/Contents/Info.plist
-	@cp Resources/wflash.bin   $(APP_BUNDLE)/Contents/Resources/wflash.bin
+	@cp Resources/Info.plist    $(APP_BUNDLE)/Contents/Info.plist
+	@cp Resources/wflash.bin    $(APP_BUNDLE)/Contents/Resources/wflash.bin
+	@cp Resources/AppIcon.icns  $(APP_BUNDLE)/Contents/Resources/AppIcon.icns
 	@echo "Built $(APP_BUNDLE)"
 
 $(BINARY): $(OBJS) $(LIBUSB_A)
@@ -114,6 +118,19 @@ $(OBJ_DIR)/%.o: %.m
 
 run: all
 	open $(APP_BUNDLE)
+
+# --------------------------------------------------------------------------
+# DMG distribution package
+# --------------------------------------------------------------------------
+dmg: all
+	@rm -f $(DMG_OUT)
+	@echo "Creating DMG…"
+	@hdiutil create \
+	    -volname "MegaWifi Programmer" \
+	    -srcfolder $(APP_BUNDLE) \
+	    -ov -format UDZO \
+	    $(DMG_OUT)
+	@echo "DMG ready: $(DMG_OUT)"
 
 clean:
 	rm -rf $(BUILD_DIR)

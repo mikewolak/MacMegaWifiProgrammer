@@ -134,6 +134,10 @@ static NSError *MDMAError(NSInteger code, NSString *msg) {
     CFRunLoopSourceRef     _runLoopSource;
     dispatch_queue_t       _usbQueue;
     BOOL                   _cancelled;
+    // Incremented on every removal (main thread). Retry blocks capture this
+    // value at dispatch time and bail immediately if it has changed, so no
+    // retry ever outlives the removal event that should cancel it.
+    NSUInteger             _connectGeneration;
 }
 @property (nonatomic, readwrite) BOOL connected;
 @property (nonatomic, readwrite, nullable) MDMAInitInfo *deviceInfo;
@@ -154,6 +158,13 @@ static NSError *MDMAError(NSInteger code, NSString *msg) {
     _maxRetries = 3;
     _retryDelay = 0.5;
     _connected  = NO;
+    // Hold a permanent libusb reference for the app's lifetime.
+    // libusb_exit(NULL) inside UsbClose/UsbCloseOnRemoval only decrements
+    // the ref count — it never reaches zero, so the darwin event thread is
+    // never joined (pthread_join). Without this, libusb_exit blocks for up
+    // to REGULAR_TIMEOUT (7 s) waiting for the thread to wake up after each
+    // device removal, freezing _usbQueue and preventing replug detection.
+    libusb_init(NULL);
     return self;
 }
 
@@ -161,7 +172,9 @@ static NSError *MDMAError(NSInteger code, NSString *msg) {
 
 static void deviceAdded(void *ctx, io_iterator_t iter) {
     io_service_t svc;
-    while ((svc = IOIteratorNext(iter))) IOObjectRelease(svc);
+    BOOL any = NO;
+    while ((svc = IOIteratorNext(iter))) { IOObjectRelease(svc); any = YES; }
+    NSLog(@"[USB] deviceAdded fired — any=%d", any);
     MDMADevice *dev = (__bridge MDMADevice *)ctx;
     dispatch_async(dev->_usbQueue, ^{ [dev _tryConnect]; });
 }
@@ -170,13 +183,15 @@ static void deviceRemoved(void *ctx, io_iterator_t iter) {
     io_service_t svc;
     BOOL anyRemoved = NO;
     while ((svc = IOIteratorNext(iter))) { IOObjectRelease(svc); anyRemoved = YES; }
+    NSLog(@"[USB] deviceRemoved fired — anyRemoved=%d", anyRemoved);
     if (!anyRemoved) return;  // startup drain — no real removal
 
     MDMADevice *dev = (__bridge MDMADevice *)ctx;
 
-    // Clear connected immediately here (main thread) — before any dispatch —
-    // so _tryConnect on _usbQueue sees NO and does not bail out on replug.
+    dev->_connectGeneration++;
     dev->_connected = NO;
+    dev->_cancelled = YES;   // abort any in-flight _retryBlock so _usbQueue drains fast
+    NSLog(@"[USB] removal: gen now %lu", (unsigned long)dev->_connectGeneration);
 
     // UsbCloseOnRemoval must run on _usbQueue (serial), which guarantees it
     // completes before any subsequent _tryConnect that is also queued there.
@@ -227,23 +242,59 @@ static void deviceRemoved(void *ctx, io_iterator_t iter) {
 
 - (void)_tryConnect {
     if (self.connected) return;
-    // IOKit fires deviceAdded before libusb can fully enumerate the device.
-    // Retry a few times with a short delay to let the device settle.
-    int usbInitResult = -1;
-    for (int attempt = 0; attempt < 5; attempt++) {
-        if (attempt > 0) [NSThread sleepForTimeInterval:0.3];
-        usbInitResult = UsbInit();
-        if (usbInitResult == 0) break;
+    // Capture generation at the moment this connect attempt starts.
+    // If a removal fires before we finish, generation is incremented on the
+    // main thread and our next check bails — no blocking, no stale open.
+    [self _tryConnectGeneration:_connectGeneration attempt:0];
+}
+
+- (void)_tryConnectGeneration:(NSUInteger)gen attempt:(int)attempt {
+    NSLog(@"[USB] _tryConnectGeneration gen=%lu attempt=%d curGen=%lu connected=%d",
+          (unsigned long)gen, attempt, (unsigned long)_connectGeneration, self.connected);
+    if (_connectGeneration != gen) { NSLog(@"[USB] gen mismatch — aborting"); return; }
+    if (self.connected) return;
+    if (attempt >= 10) { NSLog(@"[USB] gave up after 10 attempts"); return; }
+
+    int r = UsbInit();
+    NSLog(@"[USB] UsbInit attempt %d → %d", attempt, r);
+    if (r != 0) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)),
+                       _usbQueue, ^{
+            [self _tryConnectGeneration:gen attempt:attempt + 1];
+        });
+        return;
     }
-    if (usbInitResult != 0) return;
+
+    // UsbInit succeeded — clear the cancellation flag so post-connect queries run normally
+    self->_cancelled = NO;
+
+    // Give the programmer firmware 200 ms to settle after USB enumeration
+    // before sending the first bulk command. Firing immediately can cause
+    // FEATURES_GET to time out even though the device is physically present.
+    usleep(200000);
+
+    // Bail if a removal fired during the sleep
+    if (_connectGeneration != gen) { NSLog(@"[USB] gen changed during settle delay — aborting"); return; }
 
     InitData id;
     memset(&id, 0, sizeof(id));
-    if (MDMA_cart_init(&id) != 0) { UsbClose(); return; }
+    int cartInitRet = MDMA_cart_init(&id);
+    NSLog(@"[USB] MDMA_cart_init → %d (attempt %d)", cartInitRet, attempt);
+    if (cartInitRet != 0) {
+        UsbClose();
+        // Cart may not be seated yet — retry
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)),
+                       _usbQueue, ^{
+            [self _tryConnectGeneration:gen attempt:attempt + 1];
+        });
+        return;
+    }
     // Use the first key reported by the device; fall back to MegaWiFi
     MdmaCartType autoType = (id.num_drivers > 0 && id.key[0] == MDMA_CART_TYPE_GHETTO_MAPPER)
                           ? MDMA_CART_TYPE_GHETTO_MAPPER : MDMA_CART_TYPE_MEGAWIFI;
-    if (MDMA_cart_type_set(autoType) != 0) { UsbClose(); return; }
+    int cartTypeRet = MDMA_cart_type_set(autoType);
+    NSLog(@"[USB] MDMA_cart_type_set(%d) → %d", autoType, cartTypeRet);
+    if (cartTypeRet != 0) { UsbClose(); return; }
 
     MDMAInitInfo *info = [MDMAInitInfo new];
     info.verMajor  = id.ver_major;

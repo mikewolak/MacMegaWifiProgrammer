@@ -3,13 +3,15 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key>
-    <string>MegaDriveProgrammer</string>
+    <string>MegaWifiProgrammer</string>
     <key>CFBundleIdentifier</key>
     <string>com.megawifi.mdma</string>
     <key>CFBundleName</key>
-    <string>MegaDrive Programmer</string>
+    <string>MegaWifi Programmer</string>
     <key>CFBundleDisplayName</key>
-    <string>MegaDrive Programmer</string>
+    <string>MegaWifi Programmer</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundleVersion</key>
     <string>1.0</string>
     <key>CFBundleShortVersionString</key>
