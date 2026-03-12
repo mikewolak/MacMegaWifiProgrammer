@@ -59,9 +59,10 @@ OBJS   = $(OBJS_C) $(OBJS_M)
 
 all: $(APP_BUNDLE)
 
-$(APP_BUNDLE): $(BINARY) Resources/Info.plist
+$(APP_BUNDLE): $(BINARY) Resources/Info.plist Resources/wflash.bin
 	@mkdir -p $(APP_BUNDLE)/Contents/Resources
-	@cp Resources/Info.plist $(APP_BUNDLE)/Contents/Info.plist
+	@cp Resources/Info.plist   $(APP_BUNDLE)/Contents/Info.plist
+	@cp Resources/wflash.bin   $(APP_BUNDLE)/Contents/Resources/wflash.bin
 	@echo "Built $(APP_BUNDLE)"
 
 $(BINARY): $(OBJS)
