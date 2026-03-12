@@ -69,6 +69,13 @@ static NSString * const kItemRecovery = @"Recovery";
     win.minSize = NSMakeSize(540, 420);
     win.delegate = self;
     win.releasedWhenClosed = NO;
+
+    // Unified titlebar + toolbar: one seamless header, no dividing line
+    win.titlebarAppearsTransparent = YES;
+    if (@available(macOS 11.0, *)) {
+        win.toolbarStyle = NSWindowToolbarStyleUnified;
+    }
+
     [win center];
 
     [self _buildToolbar];
@@ -105,16 +112,21 @@ static NSString * const kItemRecovery = @"Recovery";
 {
     NSView *root = self.window.contentView;
 
-    // Content area sits above the status strip (40px at bottom)
-    _contentArea = [[NSView alloc] initWithFrame:NSZeroRect];
-    _contentArea.translatesAutoresizingMaskIntoConstraints = NO;
-    [root addSubview:_contentArea];
+    // Content area — visual effect gives it the warm gray Pro-app look.
+    // Tab views are plain NSViews (transparent), so the effect shows through.
+    NSVisualEffectView *vev = [[NSVisualEffectView alloc] init];
+    vev.material     = NSVisualEffectMaterialSidebar;
+    vev.blendingMode = NSVisualEffectBlendingModeWithinWindow;
+    vev.state        = NSVisualEffectStateActive;
+    vev.translatesAutoresizingMaskIntoConstraints = NO;
+    [root addSubview:vev];
+    _contentArea = vev;
 
     [NSLayoutConstraint activateConstraints:@[
         [_contentArea.topAnchor constraintEqualToAnchor:root.topAnchor],
         [_contentArea.leadingAnchor constraintEqualToAnchor:root.leadingAnchor],
         [_contentArea.trailingAnchor constraintEqualToAnchor:root.trailingAnchor],
-        [_contentArea.bottomAnchor constraintEqualToAnchor:root.bottomAnchor constant:-40],
+        [_contentArea.bottomAnchor constraintEqualToAnchor:root.bottomAnchor constant:-36],
     ]];
 
     // Build child VCs (lazy)
@@ -130,18 +142,20 @@ static NSString * const kItemRecovery = @"Recovery";
 {
     NSView *root = self.window.contentView;
 
-    // Hairline separator
-    NSBox *sep = [[NSBox alloc] initWithFrame:NSZeroRect];
-    sep.boxType = NSBoxSeparator;
-    sep.translatesAutoresizingMaskIntoConstraints = NO;
-    [root addSubview:sep];
+    // Frosted status strip — sidebar material gives a distinct panel feel
+    NSVisualEffectView *statusBg = [[NSVisualEffectView alloc] init];
+    statusBg.material     = NSVisualEffectMaterialSidebar;
+    statusBg.blendingMode = NSVisualEffectBlendingModeWithinWindow;
+    statusBg.state        = NSVisualEffectStateActive;
+    statusBg.translatesAutoresizingMaskIntoConstraints = NO;
+    [root addSubview:statusBg positioned:NSWindowBelow relativeTo:nil];
 
     // Connection indicator (right-aligned)
-    _connLabel = [NSTextField labelWithString:@"● Programmer Disconnected"];
+    _connLabel = [NSTextField labelWithString:@"● Disconnected"];
     _connLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    _connLabel.font = [NSFont monospacedSystemFontOfSize:11 weight:NSFontWeightRegular];
+    _connLabel.font = [NSFont monospacedSystemFontOfSize:11 weight:NSFontWeightMedium];
     _connLabel.textColor = [NSColor secondaryLabelColor];
-    [root addSubview:_connLabel];
+    [statusBg addSubview:_connLabel];
 
     // Progress bar (hidden initially)
     _progressBar = [[NSProgressIndicator alloc] initWithFrame:NSZeroRect];
@@ -149,9 +163,10 @@ static NSString * const kItemRecovery = @"Recovery";
     _progressBar.indeterminate = NO;
     _progressBar.minValue = 0; _progressBar.maxValue = 1;
     _progressBar.doubleValue = 0;
+    _progressBar.controlSize = NSControlSizeSmall;
     _progressBar.translatesAutoresizingMaskIntoConstraints = NO;
     _progressBar.hidden = YES;
-    [root addSubview:_progressBar];
+    [statusBg addSubview:_progressBar];
 
     // Status label
     _statusLabel = [NSTextField labelWithString:@"Ready"];
@@ -159,7 +174,7 @@ static NSString * const kItemRecovery = @"Recovery";
     _statusLabel.font = [NSFont systemFontOfSize:11];
     _statusLabel.textColor = [NSColor secondaryLabelColor];
     _statusLabel.lineBreakMode = NSLineBreakByTruncatingTail;
-    [root addSubview:_statusLabel];
+    [statusBg addSubview:_statusLabel];
 
     // Cancel button
     _cancelButton = [NSButton buttonWithTitle:@"Cancel"
@@ -168,32 +183,36 @@ static NSString * const kItemRecovery = @"Recovery";
     _cancelButton.translatesAutoresizingMaskIntoConstraints = NO;
     _cancelButton.hidden = YES;
     _cancelButton.controlSize = NSControlSizeSmall;
-    [root addSubview:_cancelButton];
+    [statusBg addSubview:_cancelButton];
 
     [NSLayoutConstraint activateConstraints:@[
-        // Separator
-        [sep.leadingAnchor  constraintEqualToAnchor:root.leadingAnchor],
-        [sep.trailingAnchor constraintEqualToAnchor:root.trailingAnchor],
-        [sep.bottomAnchor   constraintEqualToAnchor:root.bottomAnchor constant:-40],
+        // Status strip — bottom 36 px of window
+        [statusBg.leadingAnchor  constraintEqualToAnchor:root.leadingAnchor],
+        [statusBg.trailingAnchor constraintEqualToAnchor:root.trailingAnchor],
+        [statusBg.bottomAnchor   constraintEqualToAnchor:root.bottomAnchor],
+        [statusBg.heightAnchor   constraintEqualToConstant:36],
 
-        // Connection label — right side, vertically centred in strip
-        [_connLabel.trailingAnchor constraintEqualToAnchor:root.trailingAnchor constant:-12],
-        [_connLabel.centerYAnchor  constraintEqualToAnchor:root.bottomAnchor   constant:-20],
+        // Connection label — right side
+        [_connLabel.trailingAnchor constraintEqualToAnchor:statusBg.trailingAnchor constant:-12],
+        [_connLabel.centerYAnchor  constraintEqualToAnchor:statusBg.centerYAnchor],
 
         // Cancel button — left of conn label
         [_cancelButton.trailingAnchor constraintEqualToAnchor:_connLabel.leadingAnchor constant:-8],
-        [_cancelButton.centerYAnchor  constraintEqualToAnchor:_connLabel.centerYAnchor],
+        [_cancelButton.centerYAnchor  constraintEqualToAnchor:statusBg.centerYAnchor],
 
         // Progress bar — fills left portion
-        [_progressBar.leadingAnchor  constraintEqualToAnchor:root.leadingAnchor  constant:8],
+        [_progressBar.leadingAnchor  constraintEqualToAnchor:statusBg.leadingAnchor  constant:12],
         [_progressBar.trailingAnchor constraintEqualToAnchor:_cancelButton.leadingAnchor constant:-8],
-        [_progressBar.centerYAnchor  constraintEqualToAnchor:_connLabel.centerYAnchor],
+        [_progressBar.centerYAnchor  constraintEqualToAnchor:statusBg.centerYAnchor],
 
         // Status label — same space as progress bar when bar is hidden
-        [_statusLabel.leadingAnchor  constraintEqualToAnchor:root.leadingAnchor constant:8],
+        [_statusLabel.leadingAnchor  constraintEqualToAnchor:statusBg.leadingAnchor constant:12],
         [_statusLabel.trailingAnchor constraintEqualToAnchor:_cancelButton.leadingAnchor constant:-8],
-        [_statusLabel.centerYAnchor  constraintEqualToAnchor:_connLabel.centerYAnchor],
+        [_statusLabel.centerYAnchor  constraintEqualToAnchor:statusBg.centerYAnchor],
     ]];
+
+    // Shrink the content area to sit above the status strip
+    // (already constrained to root.bottomAnchor - 40; update to 36)
 }
 
 // ---------------------------------------------------------------------------
@@ -334,9 +353,9 @@ static NSString * const kItemRecovery = @"Recovery";
 - (void)_updateConnectionLabel
 {
     BOOL conn = [MDMADevice sharedDevice].connected;
-    _connLabel.stringValue = conn ? @"● Programmer Connected" : @"● Programmer Disconnected";
+    _connLabel.stringValue = conn ? @"● Connected" : @"● Disconnected";
     _connLabel.textColor   = conn ? [NSColor systemGreenColor]
-                                  : [NSColor secondaryLabelColor];
+                                  : [NSColor tertiaryLabelColor];
 }
 
 - (void)dealloc
