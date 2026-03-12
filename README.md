@@ -101,4 +101,4 @@ wflash WiFi loader ROM: [mw-wflash](https://gitlab.com/doragasu/mw-wflash)
 ## Credits
 
 Original MDMA firmware and protocol: [doragasu](https://github.com/doragasu)
-macOS application: doragasu / mikewolak, 2015–2026
+macOS application: mikewolak, 2015–2026
