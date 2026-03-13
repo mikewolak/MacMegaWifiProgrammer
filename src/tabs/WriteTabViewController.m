@@ -347,30 +347,57 @@
 {
     BOOL connected = (_wifiSock >= 0);
     [_connectWiFiButton setTitle:connected ? @"Disconnect" : @"Connect"];
-    _connectWiFiButton.enabled   = YES;
-    _writeWiFiButton.enabled     = connected;
-    _hostField.enabled           = !connected;
-    _portField.enabled           = !connected;
+    _connectWiFiButton.enabled = YES;
+    _writeWiFiButton.enabled   = YES;   // always enabled — auto-connects if needed
+    _hostField.enabled         = !connected;
+    _portField.enabled         = !connected;
 }
 
 // ── WiFi write ────────────────────────────────────────────────────────────────
 
 - (void)_writeWiFi:(id)sender
 {
-    if (_wifiSock < 0) {
-        [self _alertTitle:@"Not Connected" message:@"Click Connect first."]; return;
-    }
     NSData *data = [self _loadROM];
     if (!data) return;
 
+    if (_wifiSock < 0) {
+        // Auto-connect then write — developer workflow: one button per flash cycle
+        NSString *host = _hostField.stringValue;
+        if (!host.length) {
+            [self _alertTitle:@"No IP Address" message:@"Enter the Genesis IP address first."]; return;
+        }
+        uint16_t port = (uint16_t)(_portField.intValue ?: 1989);
+        [[NSUserDefaults standardUserDefaults] setObject:host forKey:@"wflashLastIP"];
+
+        [self.windowController setOperationActive:YES];
+        [self updateStatus:[NSString stringWithFormat:@"Connecting to %@:%u…", host, port]];
+        [self updateProgress:0];
+
+        [[MDMADevice sharedDevice] connectToWflashHost:host port:port
+                                            completion:^(int sock, NSError *connErr) {
+            if (connErr) {
+                [self operationDone];
+                [self updateStatus:[NSString stringWithFormat:@"Connect failed: %@",
+                                   connErr.localizedDescription]];
+                return;
+            }
+            [self _doWriteOnSocket:sock data:data];
+        }];
+        return;
+    }
+
     int sock = _wifiSock;
-    _wifiSock = -1;              // ownership transferred to writeFlashOnSocket
+    _wifiSock = -1;
     [self _updateWiFiConnectionState];
 
     [self.windowController setOperationActive:YES];
     [self updateStatus:@"Erasing…"];
     [self updateProgress:0];
+    [self _doWriteOnSocket:sock data:data];
+}
 
+- (void)_doWriteOnSocket:(int)sock data:(NSData *)data
+{
     [[MDMADevice sharedDevice] writeFlashOnSocket:sock
                                              data:data
                                         atAddress:0x000000
@@ -378,12 +405,14 @@
         [self updateProgress:f];
         [self updateStatus:st];
     } completion:^(NSError *err) {
+        self->_wifiSock = -1;
+        [self _updateWiFiConnectionState];
         [self operationDone];
         if (err) {
             [self updateStatus:[NSString stringWithFormat:@"WiFi write failed: %@",
                                err.localizedDescription]];
         } else {
-            [self updateStatus:@"WiFi write complete — ROM is running."];
+            [self updateStatus:@"WiFi write complete — ROM is running. Click Write to flash again."];
         }
     }];
 }
