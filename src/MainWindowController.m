@@ -302,6 +302,7 @@ static NSString * const kItemRecovery = @"Recovery";
     dispatch_async(dispatch_get_main_queue(), ^{
         if (fraction < 0) {
             self->_progressBar.hidden = YES;
+            self->_progressBar.doubleValue = 0;
             self->_statusLabel.hidden = NO;
         } else {
             self->_progressBar.hidden = NO;
