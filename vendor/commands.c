@@ -581,6 +581,61 @@ int MDMA_WiFiCmdLong(uint8_t *payload, uint16_t len, uint8_t *reply)
 	return recvLen;
 }
 
+// Send a MegaWiFi application command (LSD-framed, channel 1) and receive the
+// raw ESP response.
+//
+// payload must begin with LSD channel byte (0x01):
+//   [0x01][cmd_lo][cmd_hi][data_len_lo][data_len_hi][data...]
+//
+// On success: reply[] is filled with the raw ESP SLIP payload bytes,
+//             e.g. [0x01][MW_CMD_OK=0][0x00][data_len_lo][data_len_hi][data...],
+//             and the return value is the actual byte count received.
+// On error (AVR timeout, USB failure): returns -1.
+//
+// Note: AVR buffer is VENDOR_O_EPSIZE (64 bytes) so responses longer than
+// 64 bytes are silently truncated by the hardware.
+int MDMA_WiFiAppCmd(uint8_t *payload, uint16_t len, uint8_t *reply, int replyCapacity)
+{
+	int r, size;
+	Command command_out = { { MDMA_WIFI_CMD_LONG } };
+	Command command_in;
+	memset(&command_in, 0, sizeof(command_in));
+
+	command_out.WiFiFrame.len[0] = len & 0xFF;
+	command_out.WiFiFrame.len[1] = len >> 8;
+
+	// Send MDMA_WIFI_CMD_LONG header
+	r = megawifi_bulk_send_command("WIFI_APP_CMD", &command_out);
+	if (r < 0) return -1;
+
+	// Send the LSD-framed MW payload
+	r = libusb_bulk_transfer(megawifi_handle, MeGaWiFi_ENDPOINT_OUT,
+			payload, len, &size, REGULAR_TIMEOUT);
+	if (r != LIBUSB_SUCCESS) {
+		PrintErr("WIFI_APP_CMD: payload send failed: %s\n", libusb_error_name(r));
+		return -1;
+	}
+
+	// Receive ESP response: AVR places raw SLIP-decoded bytes in its USB buffer.
+	// A 1-byte response of 0xFF means MDMA_ERR (AVR timed out waiting for ESP).
+	r = libusb_bulk_transfer(megawifi_handle, MeGaWiFi_ENDPOINT_IN,
+			command_in.bytes, COMMAND_FRAME_BYTES, &size, REGULAR_TIMEOUT);
+	// Short packets (e.g. 1-byte MDMA_ERR) return LIBUSB_SUCCESS with size=1.
+	if (r < 0) {
+		PrintErr("WIFI_APP_CMD: response recv failed: %s\n", libusb_error_name(r));
+		return -1;
+	}
+	if (size < 1) return -1;
+
+	// MDMA_ERR: AVR timed out — ESP did not respond
+	if (command_in.bytes[0] == (uint8_t)MDMA_ERR) return -1;
+
+	// Success: copy raw bytes to caller
+	int copyLen = (size < replyCapacity) ? size : replyCapacity;
+	if (reply) memcpy(reply, command_in.bytes, copyLen);
+	return size;
+}
+
 int MDMA_WiFiCtrl(MdmaWifiCtrlCode code)
 {
 	int r;

@@ -86,34 +86,6 @@ typedef void (^MDMADataCompletionBlock)(NSData * _Nullable data, NSError * _Null
                   progress:(nullable MDMAProgressBlock)progress
                 completion:(MDMACompletionBlock)completion;
 
-// WiFi module (ESP8266/C3) firmware flash
-- (void)flashWiFiFirmwareAtPath:(NSString *)path
-                        address:(uint32_t)addr
-                        spiMode:(int)spiMode
-                       progress:(nullable MDMAProgressBlock)progress
-                     completion:(MDMACompletionBlock)completion;
-
-// WiFi network configuration (MegaWiFi protocol over USB)
-// slot: 0-2  phy: 0=b/g/n (auto), 1=b, 2=g, 3=n
-- (void)setAPConfigSlot:(uint8_t)slot
-                   ssid:(NSString *)ssid
-               password:(NSString *)password
-                    phy:(uint8_t)phy
-             completion:(MDMACompletionBlock)completion;
-
-- (void)getAPConfigSlot:(uint8_t)slot
-             completion:(void(^)(NSString * _Nullable ssid,
-                                 NSString * _Nullable password,
-                                 NSError  * _Nullable error))completion;
-
-- (void)joinAPSlot:(uint8_t)slot completion:(MDMACompletionBlock)completion;
-- (void)leaveAPWithCompletion:(MDMACompletionBlock)completion;
-
-// Returns raw sys_stat byte; cb on main queue
-- (void)getWiFiStatusWithCompletion:(void(^)(uint8_t sysStatByte,
-                                             NSString * _Nullable statusString,
-                                             NSError  * _Nullable error))completion;
-
 // Bootloader entry (device disconnects after this)
 - (void)enterBootloaderWithCompletion:(nullable MDMACompletionBlock)completion;
 

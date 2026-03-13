@@ -6,7 +6,6 @@
 #import "tabs/WriteTabViewController.h"
 #import "tabs/ReadTabViewController.h"
 #import "tabs/EraseTabViewController.h"
-#import "tabs/WiFiTabViewController.h"
 #import "tabs/InfoTabViewController.h"
 #import "tabs/FlashRecoveryTabViewController.h"
 
@@ -16,7 +15,6 @@ static NSString * const kToolbarIdentifier = @"MDMAToolbar";
 static NSString * const kItemWrite  = @"Write";
 static NSString * const kItemRead   = @"Read";
 static NSString * const kItemErase  = @"Erase";
-static NSString * const kItemWiFi   = @"WiFi";
 static NSString * const kItemInfo     = @"Info";
 static NSString * const kItemRecovery = @"Recovery";
 
@@ -28,7 +26,6 @@ static NSString * const kItemRecovery = @"Recovery";
     WriteTabViewController  *_writeVC;
     ReadTabViewController   *_readVC;
     EraseTabViewController  *_eraseVC;
-    WiFiTabViewController   *_wifiVC;
     InfoTabViewController            *_infoVC;
     FlashRecoveryTabViewController   *_recoveryVC;
     NSViewController        *_currentVC;
@@ -133,7 +130,6 @@ static NSString * const kItemRecovery = @"Recovery";
     _writeVC = [[WriteTabViewController alloc] initWithWindowController:self];
     _readVC  = [[ReadTabViewController  alloc] initWithWindowController:self];
     _eraseVC = [[EraseTabViewController alloc] initWithWindowController:self];
-    _wifiVC  = [[WiFiTabViewController  alloc] initWithWindowController:self];
     _infoVC      = [[InfoTabViewController           alloc] initWithWindowController:self];
     _recoveryVC  = [[FlashRecoveryTabViewController  alloc] initWithWindowController:self];
 }
@@ -225,7 +221,6 @@ static NSString * const kItemRecovery = @"Recovery";
     if      ([identifier isEqual:kItemWrite]) vc = _writeVC;
     else if ([identifier isEqual:kItemRead])  vc = _readVC;
     else if ([identifier isEqual:kItemErase]) vc = _eraseVC;
-    else if ([identifier isEqual:kItemWiFi])     vc = _wifiVC;
     else if ([identifier isEqual:kItemRecovery]) vc = _recoveryVC;
     else                                         vc = _infoVC;
 
@@ -256,12 +251,12 @@ static NSString * const kItemRecovery = @"Recovery";
 
 - (NSArray<NSToolbarItemIdentifier> *)toolbarAllowedItemIdentifiers:(NSToolbar *)tb
 {
-    return @[kItemWrite, kItemRead, kItemErase, kItemWiFi, kItemInfo, kItemRecovery];
+    return @[kItemWrite, kItemRead, kItemErase, kItemInfo, kItemRecovery];
 }
 
 - (NSArray<NSToolbarItemIdentifier> *)toolbarDefaultItemIdentifiers:(NSToolbar *)tb
 {
-    return @[kItemWrite, kItemRead, kItemErase, kItemWiFi, kItemInfo, kItemRecovery];
+    return @[kItemWrite, kItemRead, kItemErase, kItemInfo, kItemRecovery];
 }
 
 - (NSToolbarItem *)toolbar:(NSToolbar *)tb
@@ -278,7 +273,6 @@ static NSString * const kItemRecovery = @"Recovery";
     if      ([ident isEqual:kItemWrite]) sfName = @"square.and.arrow.down";
     else if ([ident isEqual:kItemRead])  sfName = @"square.and.arrow.up";
     else if ([ident isEqual:kItemErase]) sfName = @"trash";
-    else if ([ident isEqual:kItemWiFi])  sfName = @"wifi";
     else if ([ident isEqual:kItemRecovery]) sfName = @"bandage";
     else                                    sfName = @"info.circle";
 

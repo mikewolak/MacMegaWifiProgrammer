@@ -31,11 +31,6 @@ A native macOS application for reading, writing, erasing, and recovering the fla
 - **Full chip erase** — erases the entire flash (up to ~2 minutes, uses chip-erase command)
 - **Range erase** — erases a specific address range by sector
 
-### WiFi
-- Configure up to three AP credential slots (SSID, password, PHY mode)
-- Read back stored AP configuration from the cartridge
-- Join / leave a configured AP slot
-- Query live WiFi status (FSM state, online flag, active AP slot)
 
 ### Info
 - Displays programmer firmware version (major.minor.micro)

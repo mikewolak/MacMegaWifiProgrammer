@@ -189,6 +189,12 @@ int MDMA_WiFiCmd(uint8_t *payload, uint8_t len, uint8_t *reply);
 
 int MDMA_WiFiCmdLong(uint8_t *payload, uint16_t len, uint8_t *reply);
 
+// Send a MegaWiFi application command (LSD-framed) and receive raw ESP response.
+// payload: [0x01 (LSD ch)][cmd_lo][cmd_hi][data_len_lo][data_len_hi][data...]
+// reply:   [0x01][resp_cmd_lo][resp_cmd_hi][data_len_lo][data_len_hi][data...]
+// Returns byte count on success, -1 on error/timeout.
+int MDMA_WiFiAppCmd(uint8_t *payload, uint16_t len, uint8_t *reply, int replyCapacity);
+
 int MDMA_WiFiCtrl(MdmaWifiCtrlCode code);
 
 #ifdef __cplusplus
