@@ -122,14 +122,21 @@ run: all
 # --------------------------------------------------------------------------
 # DMG distribution package
 # --------------------------------------------------------------------------
+DMG_STAGING = $(BUILD_DIR)/dmg-staging
+
 dmg: all
 	@rm -f $(DMG_OUT)
+	@rm -rf $(DMG_STAGING)
+	@mkdir -p $(DMG_STAGING)
+	@cp -R $(APP_BUNDLE) $(DMG_STAGING)/
+	@ln -s /Applications $(DMG_STAGING)/Applications
 	@echo "Creating DMG…"
 	@hdiutil create \
 	    -volname "MegaWifi Programmer" \
-	    -srcfolder $(APP_BUNDLE) \
+	    -srcfolder $(DMG_STAGING) \
 	    -ov -format UDZO \
 	    $(DMG_OUT)
+	@rm -rf $(DMG_STAGING)
 	@echo "DMG ready: $(DMG_OUT)"
 
 clean:
