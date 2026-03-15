@@ -123,7 +123,7 @@ static NSString * const kItemRecovery = @"Recovery";
         [_contentArea.topAnchor constraintEqualToAnchor:root.topAnchor],
         [_contentArea.leadingAnchor constraintEqualToAnchor:root.leadingAnchor],
         [_contentArea.trailingAnchor constraintEqualToAnchor:root.trailingAnchor],
-        [_contentArea.bottomAnchor constraintEqualToAnchor:root.bottomAnchor constant:-36],
+        [_contentArea.bottomAnchor constraintEqualToAnchor:root.bottomAnchor constant:-56],
     ]];
 
     // Build child VCs (lazy)
@@ -182,33 +182,34 @@ static NSString * const kItemRecovery = @"Recovery";
     [statusBg addSubview:_cancelButton];
 
     [NSLayoutConstraint activateConstraints:@[
-        // Status strip — bottom 36 px of window
+        // Status strip — bottom 56 px of window (two rows)
         [statusBg.leadingAnchor  constraintEqualToAnchor:root.leadingAnchor],
         [statusBg.trailingAnchor constraintEqualToAnchor:root.trailingAnchor],
         [statusBg.bottomAnchor   constraintEqualToAnchor:root.bottomAnchor],
-        [statusBg.heightAnchor   constraintEqualToConstant:36],
+        [statusBg.heightAnchor   constraintEqualToConstant:56],
 
-        // Connection label — right side
-        [_connLabel.trailingAnchor constraintEqualToAnchor:statusBg.trailingAnchor constant:-12],
-        [_connLabel.centerYAnchor  constraintEqualToAnchor:statusBg.centerYAnchor],
-
-        // Cancel button — left of conn label
-        [_cancelButton.trailingAnchor constraintEqualToAnchor:_connLabel.leadingAnchor constant:-8],
-        [_cancelButton.centerYAnchor  constraintEqualToAnchor:statusBg.centerYAnchor],
-
-        // Progress bar — fills left portion
+        // Top row (centerY = top + 14): progress bar / status label
+        // Progress bar — full width, independent of cancel button
         [_progressBar.leadingAnchor  constraintEqualToAnchor:statusBg.leadingAnchor  constant:12],
-        [_progressBar.trailingAnchor constraintEqualToAnchor:_cancelButton.leadingAnchor constant:-8],
-        [_progressBar.centerYAnchor  constraintEqualToAnchor:statusBg.centerYAnchor],
+        [_progressBar.trailingAnchor constraintEqualToAnchor:statusBg.trailingAnchor constant:-12],
+        [_progressBar.centerYAnchor  constraintEqualToAnchor:statusBg.topAnchor constant:14],
 
-        // Status label — same space as progress bar when bar is hidden
+        // Status label — same row as progress bar
         [_statusLabel.leadingAnchor  constraintEqualToAnchor:statusBg.leadingAnchor constant:12],
-        [_statusLabel.trailingAnchor constraintEqualToAnchor:_cancelButton.leadingAnchor constant:-8],
-        [_statusLabel.centerYAnchor  constraintEqualToAnchor:statusBg.centerYAnchor],
+        [_statusLabel.trailingAnchor constraintEqualToAnchor:statusBg.trailingAnchor constant:-12],
+        [_statusLabel.centerYAnchor  constraintEqualToAnchor:statusBg.topAnchor constant:14],
+
+        // Bottom row (centerY = top + 42): cancel button + connection label
+        // Connection label — bottom row, right side
+        [_connLabel.trailingAnchor constraintEqualToAnchor:statusBg.trailingAnchor constant:-12],
+        [_connLabel.centerYAnchor  constraintEqualToAnchor:statusBg.topAnchor constant:42],
+
+        // Cancel button — bottom row, left of conn label, fixed position
+        [_cancelButton.trailingAnchor constraintEqualToAnchor:_connLabel.leadingAnchor constant:-8],
+        [_cancelButton.centerYAnchor  constraintEqualToAnchor:statusBg.topAnchor constant:42],
     ]];
 
-    // Shrink the content area to sit above the status strip
-    // (already constrained to root.bottomAnchor - 40; update to 36)
+    // Content area sits above the 56px two-row status strip
 }
 
 // ---------------------------------------------------------------------------
