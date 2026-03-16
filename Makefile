@@ -63,6 +63,8 @@ VENDOR_C = vendor/commands.c \
            vendor/esp-prog.c \
            vendor/progbar.c
 
+SRC_C_APP = src/me_floyd_png.c
+
 SRC_M = src/main.m \
         src/AppDelegate.m \
         src/AboutWindowController.m \
@@ -72,13 +74,13 @@ SRC_M = src/main.m \
         src/tabs/WriteTabViewController.m \
         src/tabs/ReadTabViewController.m \
         src/tabs/EraseTabViewController.m \
-        src/tabs/WiFiTabViewController.m \
         src/tabs/InfoTabViewController.m \
         src/tabs/FlashRecoveryTabViewController.m
 
-OBJS_C = $(patsubst %.c,$(OBJ_DIR)/%.o,$(VENDOR_C))
-OBJS_M = $(patsubst %.m,$(OBJ_DIR)/%.o,$(SRC_M))
-OBJS   = $(OBJS_C) $(OBJS_M)
+OBJS_C     = $(patsubst %.c,$(OBJ_DIR)/%.o,$(VENDOR_C))
+OBJS_C_APP = $(patsubst %.c,$(OBJ_DIR)/%.o,$(SRC_C_APP))
+OBJS_M     = $(patsubst %.m,$(OBJ_DIR)/%.o,$(SRC_M))
+OBJS       = $(OBJS_C) $(OBJS_C_APP) $(OBJS_M)
 
 # --------------------------------------------------------------------------
 # Targets
@@ -90,12 +92,11 @@ DMG_OUT     = $(BUILD_DIR)/$(DMG_NAME).dmg
 
 all: $(APP_BUNDLE)
 
-$(APP_BUNDLE): $(BINARY) Resources/Info.plist Resources/wflash.bin Resources/AppIcon.icns me_floyd.png
+$(APP_BUNDLE): $(BINARY) Resources/Info.plist Resources/wflash.bin Resources/AppIcon.icns
 	@mkdir -p $(APP_BUNDLE)/Contents/Resources
 	@cp Resources/Info.plist    $(APP_BUNDLE)/Contents/Info.plist
 	@cp Resources/wflash.bin    $(APP_BUNDLE)/Contents/Resources/wflash.bin
 	@cp Resources/AppIcon.icns  $(APP_BUNDLE)/Contents/Resources/AppIcon.icns
-	@cp me_floyd.png            $(APP_BUNDLE)/Contents/Resources/me_floyd.png
 	@echo "Built $(APP_BUNDLE)"
 
 $(BINARY): $(OBJS) $(LIBUSB_A)

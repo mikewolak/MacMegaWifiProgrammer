@@ -5,6 +5,10 @@
 #import "MainWindowController.h"
 #import "MDMADevice.h"
 
+@interface EraseTabViewController ()
+- (void)_updateEraseButtonEnabled;
+@end
+
 @implementation EraseTabViewController {
     NSButton    *_fullChipRadio;
     NSButton    *_rangeRadio;
@@ -63,7 +67,14 @@
     _eraseButton = [NSButton buttonWithTitle:@"Erase" target:self action:@selector(_erase:)];
     _eraseButton.bezelStyle = NSBezelStyleRounded;
     _eraseButton.translatesAutoresizingMaskIntoConstraints = NO;
+    _eraseButton.enabled = [MDMADevice sharedDevice].connected;
     [root addSubview:_eraseButton];
+
+    NSNotificationCenter *nc = [NSNotificationCenter defaultCenter];
+    [nc addObserver:self selector:@selector(_updateEraseButtonEnabled)
+               name:MDMADeviceConnectedNotification    object:nil];
+    [nc addObserver:self selector:@selector(_updateEraseButtonEnabled)
+               name:MDMADeviceDisconnectedNotification object:nil];
 
     [NSLayoutConstraint activateConstraints:@[
         [title.topAnchor    constraintEqualToAnchor:root.topAnchor constant:20],
@@ -99,6 +110,11 @@
         [_eraseButton.leadingAnchor constraintEqualToAnchor:root.leadingAnchor constant:20],
         [_eraseButton.widthAnchor  constraintEqualToConstant:120],
     ]];
+}
+
+- (void)_updateEraseButtonEnabled
+{
+    _eraseButton.enabled = [MDMADevice sharedDevice].connected;
 }
 
 - (void)_modeChanged:(id)sender

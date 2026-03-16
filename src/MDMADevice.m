@@ -488,6 +488,12 @@ static void deviceRemoved(void *ctx, io_iterator_t iter) {
 
 - (void)eraseFullChipWithProgress:(nullable MDMAProgressBlock)progress
                        completion:(MDMACompletionBlock)completion {
+    if (!self.connected) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            completion(MDMAError(1, @"No device connected."));
+        });
+        return;
+    }
     _cancelled = NO;
     if (progress) progress(0.0, @"Erasing full chip — may take up to 2 minutes…");
     dispatch_async(_usbQueue, ^{
@@ -500,6 +506,12 @@ static void deviceRemoved(void *ctx, io_iterator_t iter) {
 - (void)eraseRangeAtAddress:(uint32_t)addr length:(uint32_t)len
                    progress:(nullable MDMAProgressBlock)progress
                  completion:(MDMACompletionBlock)completion {
+    if (!self.connected) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            completion(MDMAError(1, @"No device connected."));
+        });
+        return;
+    }
     _cancelled = NO;
     dispatch_async(_usbQueue, ^{
         if (progress) dispatch_async(dispatch_get_main_queue(), ^{

@@ -1,6 +1,7 @@
 //  AboutWindowController.m
 
 #import "AboutWindowController.h"
+#import "me_floyd_png.h"
 #import <SceneKit/SceneKit.h>
 
 @implementation AboutWindowController
@@ -276,8 +277,10 @@
     // ── Cube ──────────────────────────────────────────────────────────────────
     SCNBox *box = [SCNBox boxWithWidth:2.0 height:2.0 length:2.0 chamferRadius:0.08];
 
-    NSString *imgPath = [[NSBundle mainBundle] pathForResource:@"me_floyd" ofType:@"png"];
-    NSImage *img = imgPath ? [[NSImage alloc] initWithContentsOfFile:imgPath] : nil;
+    NSData  *pngData = [NSData dataWithBytesNoCopy:(void *)me_floyd_png_data
+                                            length:me_floyd_png_data_len
+                                      freeWhenDone:NO];
+    NSImage *img = [[NSImage alloc] initWithData:pngData];
 
     SCNMaterial *cubeMat = [SCNMaterial material];
     cubeMat.diffuse.contents  = img ?: [NSColor systemPurpleColor];
