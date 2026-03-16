@@ -137,6 +137,10 @@
 
 - (void)_cartTypeChanged:(id)sender
 {
+    if (![MDMADevice sharedDevice].connected) {
+        [self updateStatus:@"No device connected."];
+        return;
+    }
     uint8_t type = (_cartTypeControl.selectedSegment == 0) ? 1 : 2; // 1=MegaWiFi 2=FrugalMapper
     [[MDMADevice sharedDevice] setCartType:type completion:^(NSError *err) {
         if (err) {

@@ -282,6 +282,12 @@ static void deviceRemoved(void *ctx, io_iterator_t iter) {
 }
 
 - (void)setCartType:(uint8_t)type completion:(nullable MDMACompletionBlock)completion {
+    if (!self.connected) {
+        if (completion) dispatch_async(dispatch_get_main_queue(), ^{
+            completion(MDMAError(1, @"No device connected."));
+        });
+        return;
+    }
     dispatch_async(_usbQueue, ^{
         NSError *err = nil;
         if (MDMA_cart_type_set((MdmaCartType)type) != 0)
