@@ -271,6 +271,10 @@
 
 - (void)_enterBootloader:(id)sender
 {
+    if (![MDMADevice sharedDevice].connected) {
+        [self updateStatus:@"No device connected."];
+        return;
+    }
     NSAlert *alert = [[NSAlert alloc] init];
     alert.messageText = @"Enter DFU Bootloader Mode?";
     alert.informativeText =

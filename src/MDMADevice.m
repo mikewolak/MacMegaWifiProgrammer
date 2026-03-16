@@ -518,6 +518,12 @@ static void deviceRemoved(void *ctx, io_iterator_t iter) {
 // ── Bootloader ────────────────────────────────────────────────────────────────
 
 - (void)enterBootloaderWithCompletion:(nullable MDMACompletionBlock)completion {
+    if (!self.connected) {
+        if (completion) dispatch_async(dispatch_get_main_queue(), ^{
+            completion(MDMAError(1, @"No device connected."));
+        });
+        return;
+    }
     dispatch_async(_usbQueue, ^{
         MDMA_bootloader();  // device disconnects — no reply expected
         dispatch_async(dispatch_get_main_queue(), ^{
