@@ -26,6 +26,8 @@ LDFLAGS = -framework Cocoa \
           -framework IOKit \
           -framework CoreFoundation \
           -framework Security \
+          -framework SceneKit \
+          -framework QuartzCore \
           $(BUILD_DIR)/libusb.a
 
 # --------------------------------------------------------------------------
@@ -63,6 +65,7 @@ VENDOR_C = vendor/commands.c \
 
 SRC_M = src/main.m \
         src/AppDelegate.m \
+        src/AboutWindowController.m \
         src/MDMADevice.m \
         src/MainWindowController.m \
         src/tabs/BaseTabViewController.m \
@@ -87,11 +90,12 @@ DMG_OUT     = $(BUILD_DIR)/$(DMG_NAME).dmg
 
 all: $(APP_BUNDLE)
 
-$(APP_BUNDLE): $(BINARY) Resources/Info.plist Resources/wflash.bin Resources/AppIcon.icns
+$(APP_BUNDLE): $(BINARY) Resources/Info.plist Resources/wflash.bin Resources/AppIcon.icns me_floyd.png
 	@mkdir -p $(APP_BUNDLE)/Contents/Resources
 	@cp Resources/Info.plist    $(APP_BUNDLE)/Contents/Info.plist
 	@cp Resources/wflash.bin    $(APP_BUNDLE)/Contents/Resources/wflash.bin
 	@cp Resources/AppIcon.icns  $(APP_BUNDLE)/Contents/Resources/AppIcon.icns
+	@cp me_floyd.png            $(APP_BUNDLE)/Contents/Resources/me_floyd.png
 	@echo "Built $(APP_BUNDLE)"
 
 $(BINARY): $(OBJS) $(LIBUSB_A)
